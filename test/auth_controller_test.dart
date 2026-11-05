@@ -2,7 +2,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:smartwallete/features/auth/data/biometric_service.dart';
 import 'package:smartwallete/features/auth/data/password_hasher.dart';
+import 'package:smartwallete/features/auth/data/recovery_code.dart';
 import 'package:smartwallete/features/auth/data/user_credentials.dart';
+import 'package:smartwallete/features/auth/data/wallet_reset_service.dart';
 import 'package:smartwallete/features/auth/logic/auth_controller.dart';
 import 'package:smartwallete/features/auth/logic/auth_providers.dart';
 import 'package:smartwallete/features/auth/logic/auth_state.dart';
@@ -16,6 +18,7 @@ void main() {
   Future<ProviderContainer> makeContainer({
     FakeCredentialsStore? store,
     FakeBiometricService? biometrics,
+    FakeWalletResetService? resetter,
   }) async {
     final ProviderContainer container = ProviderContainer.test(
       overrides: [
@@ -25,6 +28,9 @@ void main() {
         passwordHasherProvider.overrideWithValue(hasher),
         biometricServiceProvider.overrideWithValue(
           biometrics ?? FakeBiometricService(),
+        ),
+        walletResetServiceProvider.overrideWithValue(
+          resetter ?? FakeWalletResetService(),
         ),
       ],
     );
@@ -69,6 +75,28 @@ void main() {
       expect(state.name, 'Sara');
       expect(state.startingBalance, 1500);
       expect(state.fingerprintEnabled, isFalse);
+    });
+
+    test('applyBackupProfile updates the profile but keeps credentials',
+        () async {
+      final store = FakeCredentialsStore();
+      final UserCredentials original = await _credentials(hasher, 'secret1');
+      await store.write(original);
+      final ProviderContainer container = await makeContainer(store: store);
+
+      await container
+          .read(authControllerProvider.notifier)
+          .applyBackupProfile(name: 'Mona', startingBalance: 2500);
+
+      final AuthState state = container.read(authControllerProvider);
+      expect(state.name, 'Mona');
+      expect(state.startingBalance, 2500);
+
+      final UserCredentials? stored = await store.read();
+      expect(stored?.name, 'Mona');
+      expect(stored?.startingBalance, 2500);
+      expect(stored?.passwordHash, original.passwordHash);
+      expect(stored?.recoveryCodeHash, original.recoveryCodeHash);
     });
 
     test('with an existing account it starts locked', () async {
@@ -214,6 +242,108 @@ void main() {
       final AuthState state = container.read(authControllerProvider);
       expect(state.status, AuthStatus.locked);
       expect(state.errorMessage, isNull);
+    });
+
+    test('createAccount stores a recovery code', () async {
+      final store = FakeCredentialsStore();
+      final ProviderContainer container = await makeContainer(store: store);
+
+      final String code =
+          await container.read(authControllerProvider.notifier).createAccount(
+                name: 'Sara',
+                password: 'secret1',
+                startingBalance: 1000,
+              );
+
+      expect(RecoveryCode.normalize(code), hasLength(16));
+      final UserCredentials? stored = await store.read();
+      expect(stored?.recoveryCodeHash, isNotNull);
+      expect(container.read(authControllerProvider).hasRecoveryCode, isTrue);
+    });
+
+    test('a valid recovery code sets a new password', () async {
+      final store = FakeCredentialsStore();
+      final ProviderContainer container = await makeContainer(store: store);
+      final AuthController controller =
+          container.read(authControllerProvider.notifier);
+
+      final String code = await controller.createAccount(
+        name: 'Sara',
+        password: 'secret1',
+        startingBalance: 1000,
+      );
+      controller.lock();
+
+      final bool ok = await controller.resetPasswordWithRecoveryCode(
+        code: code,
+        newPassword: 'newpass1',
+      );
+      expect(ok, isTrue);
+      expect(container.read(authControllerProvider).status,
+          AuthStatus.unlocked);
+
+      controller.lock();
+      await controller.unlockWithPassword('newpass1');
+      expect(container.read(authControllerProvider).status,
+          AuthStatus.unlocked);
+
+      controller.lock();
+      await controller.unlockWithPassword('secret1');
+      expect(container.read(authControllerProvider).status,
+          AuthStatus.locked);
+    });
+
+    test('a wrong recovery code keeps the wallet locked', () async {
+      final store = FakeCredentialsStore();
+      final ProviderContainer container = await makeContainer(store: store);
+      final AuthController controller =
+          container.read(authControllerProvider.notifier);
+
+      await controller.createAccount(
+        name: 'Sara',
+        password: 'secret1',
+        startingBalance: 1000,
+      );
+      controller.lock();
+
+      final bool ok = await controller.resetPasswordWithRecoveryCode(
+        code: 'AAAA-AAAA-AAAA-AAAA',
+        newPassword: 'newpass1',
+      );
+
+      final AuthState state = container.read(authControllerProvider);
+      expect(ok, isFalse);
+      expect(state.status, AuthStatus.locked);
+      expect(state.errorMessage, isNotNull);
+    });
+
+    test('resetWallet clears credentials and returns to setup', () async {
+      final store = FakeCredentialsStore();
+      final FakeWalletResetService resetter = FakeWalletResetService();
+      final ProviderContainer container = await makeContainer(
+        store: store,
+        resetter: resetter,
+      );
+
+      await container.read(authControllerProvider.notifier).createAccount(
+            name: 'Sara',
+            password: 'secret1',
+            startingBalance: 1000,
+          );
+      await container.read(authControllerProvider.notifier).resetWallet();
+
+      expect(resetter.resetCalled, isTrue);
+      expect(await store.read(), isNull);
+      expect(container.read(authControllerProvider).status,
+          AuthStatus.needsSetup);
+    });
+
+    test('an account without a recovery code starts without one', () async {
+      final store = FakeCredentialsStore();
+      await store.write(await _credentials(hasher, 'secret1'));
+      final ProviderContainer container = await makeContainer(store: store);
+
+      expect(container.read(authControllerProvider).hasRecoveryCode, isFalse);
     });
   });
 }

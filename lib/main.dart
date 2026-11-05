@@ -16,9 +16,9 @@ class SmartWalletApp extends StatelessWidget {
     return MaterialApp(
       title: 'Smart Wallet',
       debugShowCheckedModeBanner: false,
-      theme: AppTheme.light,
+      theme: AppTheme.dark,
       darkTheme: AppTheme.dark,
-      themeMode: ThemeMode.system,
+      themeMode: ThemeMode.dark,
       home: const AuthGate(),
     );
   }

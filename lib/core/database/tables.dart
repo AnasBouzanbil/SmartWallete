@@ -1,64 +1,147 @@
 import 'package:drift/drift.dart';
 
 import 'enums.dart';
+import 'uuid.dart';
 
-// Columns for enum values are stored as text via EnumNameConverter.
-// The concrete converter instances live in database_connection.dart.
+// All money columns are INTEGER minor units (e.g. cents). Never doubles.
+// Enum columns are stored as text via EnumNameConverter.
+//
+// Every record table mixes in [SyncColumns] so a cloud sync layer can be
+// added later without a schema change:
+//  - uuid:      stable id across devices
+//  - updatedAt: repositories MUST set this on every write
+//  - deletedAt: soft delete; repositories filter `deletedAt IS NULL`
 
-/// A money movement: either income or an expense.
-@DataClassName('Transaction')
-class Transactions extends Table {
-  /// Auto-incrementing primary key.
-  IntColumn get id => integer().autoIncrement()();
-
-  /// Income or expense.
-  TextColumn get type =>
-      text().map(const EnumNameConverter<TransactionType>(TransactionType.values))();
-
-  /// Amount in the app's currency. Must be strictly positive.
-  RealColumn get amount => real().customConstraint('NOT NULL CHECK (amount > 0)')();
-
-  /// Who the transaction was with (optional).
-  TextColumn get person => text().nullable()();
-
-  /// Why / free-text note (optional).
-  TextColumn get note => text().nullable()();
-
-  /// Category label (e.g. "Food", "Rent").
-  TextColumn get category => text()();
-
-  /// When the transaction happened.
-  DateTimeColumn get date => dateTime()();
-
-  /// Path to an optional attached image in the app documents folder.
-  TextColumn get imagePath => text().nullable()();
+mixin SyncColumns on Table {
+  TextColumn get uuid => text().unique().clientDefault(newUuid)();
+  DateTimeColumn get createdAt => dateTime().clientDefault(DateTime.now)();
+  DateTimeColumn get updatedAt => dateTime().clientDefault(DateTime.now)();
+  DateTimeColumn get deletedAt => dateTime().nullable()();
 }
 
-/// A debt tracked separately from transactions.
-@DataClassName('Debt')
-class Debts extends Table {
-  /// Auto-incrementing primary key.
+/// A pocket of money: cash, bank account, savings...
+/// Current balance = openingBalanceMinor + movements (see repositories).
+@DataClassName('Account')
+class Accounts extends Table with SyncColumns {
   IntColumn get id => integer().autoIncrement()();
+  TextColumn get name => text().withLength(min: 1, max: 60)();
+  TextColumn get type =>
+      text().map(const EnumNameConverter<AccountType>(AccountType.values))();
+  IntColumn get openingBalanceMinor => integer().withDefault(const Constant(0))();
 
-  /// The other person.
-  TextColumn get person => text()();
+  /// ARGB color value shown on the account card.
+  IntColumn get colorValue => integer()();
+  IntColumn get sortOrder => integer().withDefault(const Constant(0))();
+  BoolColumn get isArchived => boolean().withDefault(const Constant(false))();
+}
 
-  /// Amount in the app's currency. Must be strictly positive.
-  RealColumn get amount => real().customConstraint('NOT NULL CHECK (amount > 0)')();
+/// Transaction category with its own icon and color.
+/// Never hard-delete a category that is in use; archive it instead.
+@DataClassName('Category')
+class Categories extends Table with SyncColumns {
+  IntColumn get id => integer().autoIncrement()();
+  TextColumn get name => text().withLength(min: 1, max: 40)();
+  TextColumn get kind => text()
+      .map(const EnumNameConverter<CategoryKind>(CategoryKind.values))();
 
-  /// Whether I lent money or I owe money.
-  TextColumn get direction =>
-      text().map(const EnumNameConverter<DebtDirection>(DebtDirection.values))();
+  /// Key into the app's icon set (resolved in the UI layer).
+  TextColumn get iconKey => text()();
+  IntColumn get colorValue => integer()();
+  IntColumn get sortOrder => integer().withDefault(const Constant(0))();
+  BoolColumn get isArchived => boolean().withDefault(const Constant(false))();
+}
 
-  /// Optional due date used for reminders.
-  DateTimeColumn get dueDate => dateTime().nullable()();
+/// A money movement: income or expense on one account.
+@DataClassName('Transaction')
+@TableIndex(name: 'idx_transactions_date', columns: {#date})
+@TableIndex(name: 'idx_transactions_account', columns: {#accountId})
+class Transactions extends Table with SyncColumns {
+  IntColumn get id => integer().autoIncrement()();
+  IntColumn get accountId => integer().references(Accounts, #id)();
+  IntColumn get categoryId => integer().references(Categories, #id)();
+  TextColumn get type => text()
+      .map(const EnumNameConverter<TransactionType>(TransactionType.values))();
 
-  /// Free-text note (optional).
+  /// Always positive; [type] decides the sign.
+  IntColumn get amountMinor => integer().check(amountMinor.isBiggerThanValue(0))();
+  TextColumn get person => text().nullable()();
   TextColumn get note => text().nullable()();
+  DateTimeColumn get date => dateTime()();
 
-  /// Whether this debt is settled. Defaults to false.
-  BoolColumn get isSettled => boolean().withDefault(const Constant(false))();
+  /// Receipt photo, RELATIVE to the app's receipts folder (never absolute,
+  /// so backups and restores keep working).
+  TextColumn get imagePath => text().nullable()();
 
-  /// When the debt record was created.
-  DateTimeColumn get createdAt => dateTime()();
+  /// Set when this transaction was generated by a recurring rule.
+  IntColumn get recurringRuleId =>
+      integer().nullable().references(RecurringRules, #id)();
+}
+
+/// Money lent to / owed to a person. Whether it is settled is derived from
+/// [DebtPayments]: settled when payments >= principalMinor.
+///
+/// If [accountId] is set, the principal moves that account's balance
+/// (lent: money left it, owed: money entered it). If null, balances are
+/// not affected.
+@DataClassName('Debt')
+class Debts extends Table with SyncColumns {
+  IntColumn get id => integer().autoIncrement()();
+  TextColumn get person => text().withLength(min: 1, max: 80)();
+  TextColumn get direction => text()
+      .map(const EnumNameConverter<DebtDirection>(DebtDirection.values))();
+  IntColumn get principalMinor =>
+      integer().check(principalMinor.isBiggerThanValue(0))();
+  DateTimeColumn get dueDate => dateTime().nullable()();
+  TextColumn get note => text().nullable()();
+  IntColumn get accountId => integer().nullable().references(Accounts, #id)();
+}
+
+/// A (partial) repayment of a debt. Same account rule as [Debts].
+@DataClassName('DebtPayment')
+class DebtPayments extends Table with SyncColumns {
+  IntColumn get id => integer().autoIncrement()();
+  IntColumn get debtId => integer().references(Debts, #id)();
+  IntColumn get amountMinor => integer().check(amountMinor.isBiggerThanValue(0))();
+  DateTimeColumn get paidAt => dateTime()();
+  TextColumn get note => text().nullable()();
+  IntColumn get accountId => integer().nullable().references(Accounts, #id)();
+}
+
+/// Standing monthly spending limit for one expense category.
+@DataClassName('Budget')
+class Budgets extends Table with SyncColumns {
+  IntColumn get id => integer().autoIncrement()();
+  IntColumn get categoryId => integer().unique().references(Categories, #id)();
+  IntColumn get limitMinor => integer().check(limitMinor.isBiggerThanValue(0))();
+}
+
+/// A repeating transaction (rent, subscription, salary...).
+/// On app start the repository creates every occurrence with
+/// nextDueDate <= today, then advances nextDueDate.
+@DataClassName('RecurringRule')
+class RecurringRules extends Table with SyncColumns {
+  IntColumn get id => integer().autoIncrement()();
+  IntColumn get accountId => integer().references(Accounts, #id)();
+  IntColumn get categoryId => integer().references(Categories, #id)();
+  TextColumn get type => text()
+      .map(const EnumNameConverter<TransactionType>(TransactionType.values))();
+  IntColumn get amountMinor => integer().check(amountMinor.isBiggerThanValue(0))();
+  TextColumn get person => text().nullable()();
+  TextColumn get note => text().nullable()();
+  TextColumn get frequency => text().map(
+      const EnumNameConverter<RecurrenceFrequency>(RecurrenceFrequency.values))();
+  DateTimeColumn get startDate => dateTime()();
+  DateTimeColumn get nextDueDate => dateTime()();
+  DateTimeColumn get endDate => dateTime().nullable()();
+  BoolColumn get isActive => boolean().withDefault(const Constant(true))();
+}
+
+/// Key/value app settings (see SettingKeys). Not part of cloud sync.
+@DataClassName('AppSetting')
+class AppSettings extends Table {
+  TextColumn get key => text()();
+  TextColumn get value => text()();
+
+  @override
+  Set<Column<Object>> get primaryKey => {key};
 }

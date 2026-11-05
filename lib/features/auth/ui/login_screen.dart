@@ -9,8 +9,9 @@ import '../../../core/theme/app_spacing.dart';
 import '../../../core/widgets/primary_button.dart';
 import '../logic/auth_controller.dart';
 import '../logic/auth_state.dart';
+import 'auth_brand.dart';
+import 'forgot_password_screen.dart';
 
-/// Locked screen: unlock with password or fingerprint.
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
 
@@ -22,6 +23,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   final TextEditingController _password = TextEditingController();
   Timer? _ticker;
   bool _promptedBiometrics = false;
+  bool _obscure = true;
 
   @override
   void initState() {
@@ -44,7 +46,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     super.dispose();
   }
 
-  /// Prompts for fingerprint once, automatically, when the screen opens.
   Future<void> _maybePromptBiometrics() async {
     final AuthState state = ref.read(authControllerProvider);
     if (_promptedBiometrics ||
@@ -63,9 +64,18 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     _password.clear();
   }
 
+  Future<void> _openForgotPassword() async {
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (BuildContext context) => const ForgotPasswordScreen(),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final ThemeData theme = Theme.of(context);
+    final AppColorSet colors = context.colors;
     final AuthState auth = ref.watch(authControllerProvider);
     final DateTime now = DateTime.now();
     final bool lockedOut = auth.isLockedOutAt(now);
@@ -73,41 +83,51 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
     return Scaffold(
       body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: AppSpacing.page,
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(AppSpacing.space24),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              minHeight: MediaQuery.sizeOf(context).height - 96,
+            ),
             child: Column(
-              mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Icon(
-                  PhosphorIconsRegular.lock,
-                  size: AppSpacing.iconXl,
-                  color: context.colors.accent,
-                ),
                 const SizedBox(height: AppSpacing.space16),
+                const AuthBrand(),
+                const SizedBox(height: AppSpacing.space32),
                 Text(
-                  'Welcome back${auth.name.isEmpty ? '' : ', ${auth.name}'}',
-                  textAlign: TextAlign.center,
-                  style: theme.textTheme.headlineSmall,
+                  'Welcome back',
+                  style: theme.textTheme.headlineMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
                 const SizedBox(height: AppSpacing.space8),
                 Text(
-                  'Enter your password to unlock.',
-                  textAlign: TextAlign.center,
+                  auth.name.isEmpty
+                      ? 'Enter your password to open your wallet.'
+                      : 'Hi ${auth.name}, enter your password to continue.',
                   style: theme.textTheme.bodyMedium?.copyWith(
-                    color: context.colors.textSecondary,
+                    color: colors.textSecondary,
                   ),
                 ),
-                const SizedBox(height: AppSpacing.space24),
+                const SizedBox(height: AppSpacing.space32),
                 TextField(
                   controller: _password,
-                  obscureText: true,
+                  obscureText: _obscure,
                   enabled: !lockedOut,
                   textInputAction: TextInputAction.done,
                   onSubmitted: (_) => lockedOut ? null : _submit(),
                   decoration: InputDecoration(
                     labelText: 'Password',
+                    prefixIcon: const Icon(PhosphorIconsRegular.lock),
+                    suffixIcon: IconButton(
+                      onPressed: () => setState(() => _obscure = !_obscure),
+                      icon: Icon(
+                        _obscure
+                            ? PhosphorIconsRegular.eye
+                            : PhosphorIconsRegular.eyeSlash,
+                      ),
+                    ),
                     errorText: lockedOut
                         ? 'Too many attempts. Try again in ${secondsLeft}s.'
                         : auth.errorMessage,
@@ -116,10 +136,16 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 const SizedBox(height: AppSpacing.space16),
                 PrimaryButton(
                   label: lockedOut ? 'Locked (${secondsLeft}s)' : 'Unlock',
+                  icon: PhosphorIconsRegular.arrowRight,
                   onPressed: lockedOut ? null : _submit,
                 ),
+                const SizedBox(height: AppSpacing.space8),
+                TextButton(
+                  onPressed: lockedOut ? null : _openForgotPassword,
+                  child: const Text('Forgot password?'),
+                ),
                 if (auth.fingerprintEnabled && auth.biometricAvailable) ...[
-                  const SizedBox(height: AppSpacing.space12),
+                  const SizedBox(height: AppSpacing.space16),
                   OutlinedButton.icon(
                     onPressed: lockedOut
                         ? null

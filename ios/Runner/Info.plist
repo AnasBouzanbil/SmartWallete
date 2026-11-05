@@ -47,6 +47,10 @@
 			</array>
 		</dict>
 	</dict>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Attach a receipt photo to a transaction.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Take a receipt photo for a transaction.</string>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
 	<key>UILaunchStoryboardName</key>

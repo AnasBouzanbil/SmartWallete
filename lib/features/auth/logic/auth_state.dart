@@ -24,6 +24,7 @@ class AuthState {
     this.startingBalance = 0,
     this.fingerprintEnabled = false,
     this.biometricAvailable = false,
+    this.hasRecoveryCode = false,
     this.errorMessage,
     this.lockedUntil,
     this.failedAttempts = 0,
@@ -35,6 +36,7 @@ class AuthState {
         startingBalance = 0,
         fingerprintEnabled = false,
         biometricAvailable = false,
+        hasRecoveryCode = false,
         errorMessage = null,
         lockedUntil = null,
         failedAttempts = 0;
@@ -46,6 +48,9 @@ class AuthState {
 
   /// Whether the device can offer fingerprint unlock right now.
   final bool biometricAvailable;
+
+  /// Whether the account has a recovery code configured.
+  final bool hasRecoveryCode;
 
   /// Error message to show under the password field (or on setup).
   final String? errorMessage;
@@ -75,6 +80,7 @@ class AuthState {
     double? startingBalance,
     bool? fingerprintEnabled,
     bool? biometricAvailable,
+    bool? hasRecoveryCode,
     String? errorMessage,
     DateTime? lockedUntil,
     int? failedAttempts,
@@ -87,6 +93,7 @@ class AuthState {
       startingBalance: startingBalance ?? this.startingBalance,
       fingerprintEnabled: fingerprintEnabled ?? this.fingerprintEnabled,
       biometricAvailable: biometricAvailable ?? this.biometricAvailable,
+      hasRecoveryCode: hasRecoveryCode ?? this.hasRecoveryCode,
       errorMessage: clearError ? null : (errorMessage ?? this.errorMessage),
       lockedUntil: clearLockout ? null : (lockedUntil ?? this.lockedUntil),
       failedAttempts: failedAttempts ?? this.failedAttempts,

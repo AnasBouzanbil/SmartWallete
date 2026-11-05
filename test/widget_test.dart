@@ -21,7 +21,7 @@ void main() {
     // Initial load is async; let it settle.
     await tester.pumpAndSettle();
 
-    expect(find.text('Set up Smart Wallet'), findsOneWidget);
-    expect(find.text('Create account'), findsOneWidget);
+    expect(find.text('Create your wallet'), findsOneWidget);
+    expect(find.text('Create wallet'), findsOneWidget);
   });
 }

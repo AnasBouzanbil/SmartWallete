@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/app_spacing.dart';
+import '../../shell/app_shell.dart';
 import '../logic/auth_controller.dart';
 import '../logic/auth_state.dart';
-import 'home_placeholder_screen.dart';
 import 'login_screen.dart';
 import 'setup_screen.dart';
 
@@ -65,7 +65,7 @@ class _AuthGateState extends ConsumerState<AuthGate>
       AuthStatus.loading => const _LoadingView(),
       AuthStatus.needsSetup => const SetupScreen(),
       AuthStatus.locked => const LoginScreen(),
-      AuthStatus.unlocked => const HomePlaceholderScreen(),
+      AuthStatus.unlocked => const AppShell(),
     };
   }
 }

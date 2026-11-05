@@ -1,6 +1,7 @@
 import 'package:smartwallete/features/auth/data/biometric_service.dart';
 import 'package:smartwallete/features/auth/data/credentials_store.dart';
 import 'package:smartwallete/features/auth/data/user_credentials.dart';
+import 'package:smartwallete/features/auth/data/wallet_reset_service.dart';
 
 /// In-memory [CredentialsStore] for tests. No platform keychain involved.
 ///
@@ -27,6 +28,16 @@ class FakeCredentialsStore implements CredentialsStore {
   @override
   Future<void> clear() async {
     _credentials = null;
+  }
+}
+
+/// In-memory [WalletResetService] for tests.
+class FakeWalletResetService implements WalletResetService {
+  bool resetCalled = false;
+
+  @override
+  Future<void> reset() async {
+    resetCalled = true;
   }
 }
 

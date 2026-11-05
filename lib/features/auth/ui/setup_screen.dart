@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:phosphor_glyphs/phosphor_glyphs.dart';
 
@@ -6,10 +7,12 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/widgets/app_card.dart';
 import '../../../core/widgets/primary_button.dart';
+import '../data/recovery_code.dart';
 import '../logic/auth_controller.dart';
 import '../logic/auth_state.dart';
+import 'auth_brand.dart';
+import 'recovery_code_dialog.dart';
 
-/// First-run screen: create the local account.
 class SetupScreen extends ConsumerStatefulWidget {
   const SetupScreen({super.key});
 
@@ -25,6 +28,7 @@ class _SetupScreenState extends ConsumerState<SetupScreen> {
   final TextEditingController _balance = TextEditingController();
 
   bool _submitting = false;
+  bool _obscure = true;
 
   @override
   void dispose() {
@@ -39,39 +43,69 @@ class _SetupScreenState extends ConsumerState<SetupScreen> {
     if (!_formKey.currentState!.validate()) {
       return;
     }
+
+    final String recoveryCode = RecoveryCode.generate();
+    final bool saved = await showRecoveryCodeDialog(
+      context,
+      code: recoveryCode,
+    );
+    if (!saved || !mounted) {
+      return;
+    }
+
     setState(() => _submitting = true);
-    await ref.read(authControllerProvider.notifier).createAccount(
-          name: _name.text,
-          password: _password.text,
-          startingBalance: double.parse(_balance.text.trim()),
+    try {
+      await ref.read(authControllerProvider.notifier).createAccount(
+            name: _name.text,
+            password: _password.text,
+            startingBalance: double.parse(_balance.text.trim()),
+            recoveryCode: recoveryCode,
+          );
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not create the wallet.')),
         );
-    if (mounted) {
-      setState(() => _submitting = false);
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _submitting = false);
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final ThemeData theme = Theme.of(context);
-    final String? loadError =
-        ref.watch(authControllerProvider.select((AuthState s) => s.errorMessage));
+    final AppColorSet colors = context.colors;
+    final String? loadError = ref.watch(
+      authControllerProvider.select((AuthState s) => s.errorMessage),
+    );
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Set up Smart Wallet')),
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: AppSpacing.page,
+          padding: const EdgeInsets.all(AppSpacing.space24),
           child: Form(
             key: _formKey,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Text('Welcome', style: theme.textTheme.headlineSmall),
+                const SizedBox(height: AppSpacing.space16),
+                const AuthBrand(subtitle: 'Your money, only on this phone'),
+                const SizedBox(height: AppSpacing.space32),
+                Text(
+                  'Create your wallet',
+                  style: theme.textTheme.headlineMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
                 const SizedBox(height: AppSpacing.space8),
                 Text(
-                  'Create your local account. Everything stays on this phone.',
+                  'Set a password to protect your data. It never leaves '
+                  'this device.',
                   style: theme.textTheme.bodyMedium?.copyWith(
-                    color: context.colors.textSecondary,
+                    color: colors.textSecondary,
                   ),
                 ),
                 if (loadError != null) ...[
@@ -79,15 +113,19 @@ class _SetupScreenState extends ConsumerState<SetupScreen> {
                   Text(
                     loadError,
                     style: theme.textTheme.bodySmall?.copyWith(
-                      color: context.colors.expense,
+                      color: colors.expense,
                     ),
                   ),
                 ],
                 const SizedBox(height: AppSpacing.space24),
                 TextFormField(
                   controller: _name,
+                  textCapitalization: TextCapitalization.words,
                   textInputAction: TextInputAction.next,
-                  decoration: const InputDecoration(labelText: 'Your name'),
+                  decoration: const InputDecoration(
+                    labelText: 'Your name',
+                    prefixIcon: Icon(PhosphorIconsRegular.user),
+                  ),
                   validator: (String? value) {
                     if (value == null || value.trim().isEmpty) {
                       return 'Please enter your name.';
@@ -98,9 +136,20 @@ class _SetupScreenState extends ConsumerState<SetupScreen> {
                 const SizedBox(height: AppSpacing.space16),
                 TextFormField(
                   controller: _password,
-                  obscureText: true,
+                  obscureText: _obscure,
                   textInputAction: TextInputAction.next,
-                  decoration: const InputDecoration(labelText: 'Password'),
+                  decoration: InputDecoration(
+                    labelText: 'Password',
+                    prefixIcon: const Icon(PhosphorIconsRegular.lock),
+                    suffixIcon: IconButton(
+                      onPressed: () => setState(() => _obscure = !_obscure),
+                      icon: Icon(
+                        _obscure
+                            ? PhosphorIconsRegular.eye
+                            : PhosphorIconsRegular.eyeSlash,
+                      ),
+                    ),
+                  ),
                   validator: (String? value) {
                     if (value == null ||
                         value.length < AuthController.minPasswordLength) {
@@ -115,8 +164,10 @@ class _SetupScreenState extends ConsumerState<SetupScreen> {
                   controller: _confirm,
                   obscureText: true,
                   textInputAction: TextInputAction.next,
-                  decoration:
-                      const InputDecoration(labelText: 'Confirm password'),
+                  decoration: const InputDecoration(
+                    labelText: 'Confirm password',
+                    prefixIcon: Icon(PhosphorIconsRegular.lockKey),
+                  ),
                   validator: (String? value) {
                     if (value != _password.text) {
                       return 'Passwords do not match.';
@@ -127,14 +178,22 @@ class _SetupScreenState extends ConsumerState<SetupScreen> {
                 const SizedBox(height: AppSpacing.space16),
                 TextFormField(
                   controller: _balance,
-                  keyboardType:
-                      const TextInputType.numberWithOptions(decimal: true),
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  inputFormatters: <TextInputFormatter>[
+                    FilteringTextInputFormatter.allow(
+                      RegExp(r'[0-9.,]'),
+                    ),
+                  ],
                   decoration: const InputDecoration(
-                    labelText: 'Starting balance (total income so far)',
+                    labelText: 'Starting balance (DH)',
+                    hintText: '0.00',
+                    prefixIcon: Icon(PhosphorIconsRegular.coins),
                   ),
                   validator: (String? value) {
                     final double? parsed = double.tryParse(
-                      (value ?? '').trim(),
+                      (value ?? '').trim().replaceAll(',', ''),
                     );
                     if (parsed == null) {
                       return 'Enter a number.';
@@ -148,19 +207,21 @@ class _SetupScreenState extends ConsumerState<SetupScreen> {
                 const SizedBox(height: AppSpacing.space24),
                 AppCard(
                   child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Icon(
-                        PhosphorIconsRegular.info,
+                        PhosphorIconsRegular.shieldCheck,
                         size: AppSpacing.iconMd,
-                        color: context.colors.textSecondary,
+                        color: colors.accent,
                       ),
                       const SizedBox(width: AppSpacing.space12),
                       Expanded(
                         child: Text(
-                          'If you forget your password, your data cannot be '
-                          'recovered.',
+                          'You will get a recovery code next. Keep it safe — '
+                          'it is the only way to recover your wallet if you '
+                          'forget your password.',
                           style: theme.textTheme.bodySmall?.copyWith(
-                            color: context.colors.textSecondary,
+                            color: colors.textSecondary,
                           ),
                         ),
                       ),
@@ -169,7 +230,8 @@ class _SetupScreenState extends ConsumerState<SetupScreen> {
                 ),
                 const SizedBox(height: AppSpacing.space24),
                 PrimaryButton(
-                  label: _submitting ? 'Creating…' : 'Create account',
+                  label: _submitting ? 'Creating…' : 'Create wallet',
+                  icon: PhosphorIconsRegular.arrowRight,
                   onPressed: _submitting ? null : _submit,
                 ),
               ],

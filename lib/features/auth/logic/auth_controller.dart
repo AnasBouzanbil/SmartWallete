@@ -1,9 +1,12 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/database/database_provider.dart';
 import '../data/biometric_service.dart';
 import '../data/credentials_store.dart';
 import '../data/password_hasher.dart';
+import '../data/recovery_code.dart';
 import '../data/user_credentials.dart';
+import '../data/wallet_reset_service.dart';
 import 'auth_providers.dart';
 import 'auth_state.dart';
 
@@ -19,6 +22,7 @@ class AuthController extends Notifier<AuthState> {
   CredentialsStore get _store => ref.read(credentialsStoreProvider);
   PasswordHasher get _hasher => ref.read(passwordHasherProvider);
   BiometricService get _biometrics => ref.read(biometricServiceProvider);
+  WalletResetService get _resetter => ref.read(walletResetServiceProvider);
 
   @override
   AuthState build() {
@@ -50,6 +54,8 @@ class AuthController extends Notifier<AuthState> {
         startingBalance: stored.startingBalance,
         fingerprintEnabled: stored.fingerprintEnabled,
         biometricAvailable: biometricAvailable,
+        hasRecoveryCode: stored.recoveryCodeHash != null &&
+            stored.recoveryCodeHash!.isNotEmpty,
       );
     } catch (_) {
       state = const AuthState(
@@ -71,17 +77,22 @@ class AuthController extends Notifier<AuthState> {
   ///
   /// Validation errors are returned as field errors by the UI; this method
   /// assumes the input is already valid.
-  Future<void> createAccount({
+  Future<String> createAccount({
     required String name,
     required String password,
     required double startingBalance,
+    String? recoveryCode,
   }) async {
     final PasswordHash hashed = await _hasher.hash(password);
+    final String code = recoveryCode ?? RecoveryCode.generate();
+    final PasswordHash recoveryHash =
+        await _hasher.hash(RecoveryCode.normalize(code));
     final UserCredentials credentials = UserCredentials(
       name: name.trim(),
       startingBalance: startingBalance,
       passwordHash: hashed.encode(),
       fingerprintEnabled: false,
+      recoveryCodeHash: recoveryHash.encode(),
     );
     await _store.write(credentials);
     state = AuthState(
@@ -90,7 +101,85 @@ class AuthController extends Notifier<AuthState> {
       startingBalance: credentials.startingBalance,
       fingerprintEnabled: false,
       biometricAvailable: state.biometricAvailable,
+      hasRecoveryCode: true,
     );
+    return code;
+  }
+
+  Future<bool> resetPasswordWithRecoveryCode({
+    required String code,
+    required String newPassword,
+  }) async {
+    final UserCredentials? stored = await _store.read();
+    final PasswordHash? recoveryHash =
+        stored?.recoveryCodeHash == null
+            ? null
+            : PasswordHash.tryDecode(stored!.recoveryCodeHash!);
+    if (stored == null || recoveryHash == null) {
+      state = state.copyWith(
+        errorMessage: 'No recovery code is set for this wallet.',
+      );
+      return false;
+    }
+
+    final bool valid = await _hasher.verify(
+      RecoveryCode.normalize(code),
+      recoveryHash,
+    );
+    if (!valid) {
+      state = state.copyWith(errorMessage: 'Wrong recovery code.');
+      return false;
+    }
+
+    final PasswordHash newHash = await _hasher.hash(newPassword);
+    final UserCredentials updated =
+        stored.copyWith(passwordHash: newHash.encode());
+    await _store.write(updated);
+    state = state.copyWith(
+      status: AuthStatus.unlocked,
+      clearError: true,
+      clearLockout: true,
+      failedAttempts: 0,
+    );
+    return true;
+  }
+
+  Future<void> applyBackupProfile({
+    required String name,
+    required double startingBalance,
+  }) async {
+    final UserCredentials? stored = await _store.read();
+    if (stored == null) {
+      throw StateError('No account available.');
+    }
+
+    final UserCredentials updated = stored.copyWith(
+      name: name.trim(),
+      startingBalance: startingBalance,
+    );
+    await _store.write(updated);
+    state = state.copyWith(
+      name: updated.name,
+      startingBalance: updated.startingBalance,
+      clearError: true,
+    );
+  }
+
+  Future<void> resetWallet() async {
+    try {
+      await _resetter.reset();
+      await _store.clear();
+      ref.invalidate(databaseProvider);
+      ref.invalidate(walletResetServiceProvider);
+      state = AuthState(
+        status: AuthStatus.needsSetup,
+        biometricAvailable: state.biometricAvailable,
+      );
+    } catch (_) {
+      state = state.copyWith(
+        errorMessage: 'Could not reset the wallet. Please try again.',
+      );
+    }
   }
 
   /// Attempts to unlock with [password].
