@@ -8,7 +8,7 @@ class AppCard extends StatelessWidget {
     super.key,
     required this.child,
     this.padding = AppSpacing.card,
-    this.radius = AppSpacing.radius12,
+    this.radius = AppSpacing.radius20,
     this.onTap,
   });
 

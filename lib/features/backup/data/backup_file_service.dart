@@ -10,7 +10,7 @@ class BackupFileService {
   Future<Uint8List?> pickJson() async {
     try {
       final PlatformFile? file = await FilePicker.pickFile(
-        dialogTitle: 'Select a Smart Wallet backup',
+        dialogTitle: 'Select a Pocket backup',
         type: FileType.custom,
         allowedExtensions: <String>['json'],
       );
@@ -32,7 +32,7 @@ class BackupFileService {
         fileName: fileName,
         bytes: bytes,
         mimeType: 'application/json',
-        dialogTitle: 'Save Smart Wallet backup',
+        dialogTitle: 'Save Pocket backup',
       );
       return uri != null;
     } catch (_) {

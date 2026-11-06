@@ -1,4 +1,4 @@
-# Smart Wallet - Flutter personal finance app
+# Pocket - Flutter personal finance app
 
 ## Constraints
 - Flutter, Android first. No backend, no server. Everything is stored locally on the phone.

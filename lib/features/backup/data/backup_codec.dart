@@ -162,7 +162,7 @@ abstract final class BackupCodec {
     final String format = _string(root, 'format', 'backup');
     if (format != BackupFormat.name) {
       throw const BackupException(
-        'This is not a Smart Wallet backup file.',
+        'This is not a Pocket backup file.',
       );
     }
 

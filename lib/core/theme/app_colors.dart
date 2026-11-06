@@ -3,6 +3,25 @@ import 'package:flutter/material.dart';
 class AppColors {
   const AppColors._();
 
+  static const AppColorSet light = AppColorSet(
+    background: Color(0xFFF7F8F2),
+    surface: Color(0xFFFFFFFF),
+    surfaceAlt: Color(0xFFEEF1E6),
+    accent: Color(0xFF4F5F00),
+    accentSoft: Color(0xFFD9F36A),
+    onAccent: Color(0xFFFFFFFF),
+    income: Color(0xFF2E7D32),
+    expense: Color(0xFFB3261E),
+    debtOwed: Color(0xFFF6DDD5),
+    debtOwedSurface: Color(0xFF7A3E2F),
+    debtLent: Color(0xFF2F5D7C),
+    debtLentSurface: Color(0xFFDDEBF5),
+    textPrimary: Color(0xFF171A12),
+    textSecondary: Color(0xFF5D6654),
+    outline: Color(0xFFD7DCCF),
+    barTrack: Color(0xFFE4E8DB),
+  );
+
   static const AppColorSet dark = AppColorSet(
     background: Color(0xFF0F100A),
     surface: Color(0xFF1D2517),
@@ -62,5 +81,8 @@ class AppColorSet {
 }
 
 extension AppColorsContext on BuildContext {
-  AppColorSet get colors => AppColors.dark;
+  AppColorSet get colors {
+    final Brightness brightness = Theme.of(this).brightness;
+    return brightness == Brightness.dark ? AppColors.dark : AppColors.light;
+  }
 }

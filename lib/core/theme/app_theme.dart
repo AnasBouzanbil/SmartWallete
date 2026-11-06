@@ -1,4 +1,6 @@
+import 'package:flutter/cupertino.dart' show CupertinoPageTransitionsBuilder;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import 'app_colors.dart';
@@ -7,37 +9,40 @@ import 'app_spacing.dart';
 class AppTheme {
   const AppTheme._();
 
-  static ThemeData get dark => _build(AppColors.dark);
+  static ThemeData get light => _build(AppColors.light, Brightness.light);
+  static ThemeData get dark => _build(AppColors.dark, Brightness.dark);
 
-  static ThemeData _build(AppColorSet colors) {
+  static ThemeData _build(AppColorSet colors, Brightness brightness) {
     final ThemeData base = ThemeData(
-      brightness: Brightness.dark,
+      brightness: brightness,
       useMaterial3: true,
     );
 
-    final TextTheme textTheme = GoogleFonts.interTextTheme(base.textTheme).apply(
-      bodyColor: colors.textPrimary,
-      displayColor: colors.textPrimary,
-    );
+    final TextTheme textTheme = GoogleFonts.interTextTheme(
+      base.textTheme,
+    ).apply(bodyColor: colors.textPrimary, displayColor: colors.textPrimary);
 
-    final ColorScheme colorScheme = ColorScheme.fromSeed(
-      seedColor: colors.accent,
-      brightness: Brightness.dark,
-    ).copyWith(
-      primary: colors.accent,
-      onPrimary: colors.onAccent,
-      secondary: colors.accentSoft,
-      onSecondary: colors.onAccent,
-      surface: colors.surface,
-      onSurface: colors.textPrimary,
-      onSurfaceVariant: colors.textSecondary,
-      surfaceContainerHighest: colors.surfaceAlt,
-      surfaceContainerLow: colors.background,
-      outline: colors.outline,
-      outlineVariant: colors.outline,
-      error: colors.expense,
-      onError: colors.onAccent,
-    );
+    final ColorScheme colorScheme =
+        ColorScheme.fromSeed(
+          seedColor: colors.accent,
+          brightness: brightness,
+        ).copyWith(
+          primary: colors.accent,
+          onPrimary: colors.onAccent,
+          secondary: colors.accentSoft,
+          onSecondary: brightness == Brightness.dark
+              ? colors.onAccent
+              : colors.textPrimary,
+          surface: colors.surface,
+          onSurface: colors.textPrimary,
+          onSurfaceVariant: colors.textSecondary,
+          surfaceContainerHighest: colors.surfaceAlt,
+          surfaceContainerLow: colors.background,
+          outline: colors.outline,
+          outlineVariant: colors.outline,
+          error: colors.expense,
+          onError: colors.onAccent,
+        );
 
     final RoundedRectangleBorder rounded16 = RoundedRectangleBorder(
       borderRadius: BorderRadius.circular(AppSpacing.radius16),
@@ -50,6 +55,19 @@ class AppTheme {
     return base.copyWith(
       colorScheme: colorScheme,
       scaffoldBackgroundColor: colors.background,
+      pageTransitionsTheme: const PageTransitionsTheme(
+        builders: <TargetPlatform, PageTransitionsBuilder>{
+          TargetPlatform.android: CupertinoPageTransitionsBuilder(),
+          TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
+        },
+      ),
+      floatingActionButtonTheme: FloatingActionButtonThemeData(
+        backgroundColor: colors.accent,
+        foregroundColor: colors.onAccent,
+        elevation: 0,
+        highlightElevation: 0,
+        shape: const StadiumBorder(),
+      ),
       textTheme: textTheme,
       iconTheme: IconThemeData(color: colors.textSecondary),
       dividerTheme: DividerThemeData(color: colors.outline, thickness: 1),
@@ -59,6 +77,9 @@ class AppTheme {
         elevation: 0,
         scrolledUnderElevation: 0,
         centerTitle: false,
+        systemOverlayStyle: brightness == Brightness.dark
+            ? SystemUiOverlayStyle.light
+            : SystemUiOverlayStyle.dark,
         iconTheme: IconThemeData(color: colors.textPrimary),
         titleTextStyle: textTheme.titleLarge?.copyWith(
           color: colors.textPrimary,

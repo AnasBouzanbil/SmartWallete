@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:phosphor_glyphs/phosphor_glyphs.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
@@ -9,33 +8,32 @@ class AuthBrand extends StatelessWidget {
 
   final String? subtitle;
 
+  static const String logoAsset = 'assets/brand/app_logo.png';
+
   @override
   Widget build(BuildContext context) {
     final ThemeData theme = Theme.of(context);
     final AppColorSet colors = context.colors;
 
     return Row(
-      children: [
-        Container(
-          width: 44,
-          height: 44,
-          decoration: BoxDecoration(
-            color: colors.accent,
-            borderRadius: BorderRadius.circular(AppSpacing.radius12),
-          ),
-          child: Icon(
-            PhosphorIconsRegular.wallet,
-            color: colors.onAccent,
-            size: AppSpacing.iconMd,
+      children: <Widget>[
+        ClipRRect(
+          borderRadius: BorderRadius.circular(AppSpacing.radius12),
+          child: Image.asset(
+            logoAsset,
+            width: 44,
+            height: 44,
+            fit: BoxFit.cover,
+            filterQuality: FilterQuality.high,
           ),
         ),
         const SizedBox(width: AppSpacing.space12),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
+            children: <Widget>[
               Text(
-                'Smart Wallet',
+                'Pocket',
                 style: theme.textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.w700,
                 ),

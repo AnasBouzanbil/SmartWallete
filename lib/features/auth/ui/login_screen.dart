@@ -82,7 +82,18 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     final int secondsLeft = auth.secondsRemainingAt(now);
 
     return Scaffold(
-      body: SafeArea(
+      body: DecoratedBox(
+        decoration: BoxDecoration(
+          gradient: RadialGradient(
+            center: const Alignment(0.9, -1.0),
+            radius: 1.1,
+            colors: <Color>[
+              colors.accent.withValues(alpha: 0.16),
+              colors.background,
+            ],
+          ),
+        ),
+        child: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(AppSpacing.space24),
           child: ConstrainedBox(
@@ -159,6 +170,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               ],
             ),
           ),
+        ),
         ),
       ),
     );

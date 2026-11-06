@@ -1,17 +1,58 @@
-# smartwallete
+# Pocket
 
-A new Flutter project.
+<p align="left">
+  <img src="assets/brand/app_logo.png" alt="Pocket logo" width="72" height="72" />
+</p>
 
-## Getting Started
+Your money, on your phone — nothing leaves the device.
 
-This project is a starting point for a Flutter application.
+Pocket is a simple personal finance app for tracking income, expenses, and debts. No account. No cloud. Just you.
 
-A few resources to get you started if this is your first Flutter project:
+## Demo
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+<video src="docs/pocket-demo.mp4" controls width="280" playsinline>
+  Your browser can’t play this video here — open
+  <a href="docs/pocket-demo.mp4">docs/pocket-demo.mp4</a> instead.
+</video>
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+[Watch the demo video](docs/pocket-demo.mp4) · ~36 seconds
+
+## What you can do
+
+- **Home** — balance, this month’s income/spent, quick add
+- **Transactions** — income & expenses with category, person, note, optional receipt
+- **Debts** — money you owe or lent, payments, due-date reminders
+- **Stats** — spending by category / person / month
+- **AI tips** — short spending advice from totals only (optional; needs a Gemini key)
+- **Backup** — export / import everything as a JSON file
+- **Security** — password + optional fingerprint / Face ID
+
+## Run it
+
+```bash
+flutter pub get
+flutter run
+```
+
+Works best on a phone or Android emulator.
+
+### Optional: AI advice
+
+1. Copy `.env.example` → `.env`
+2. Add your key: `GEMINI_API_KEY=...`
+3. Restart the app (full stop, not hot reload)
+
+Pocket still works fully if the key is missing or the network fails.
+
+## Privacy
+
+All data stays on the device (SQLite + secure storage).  
+AI tips send **aggregated totals only** — never names, notes, or receipt images.
+
+## Stack
+
+Flutter · Riverpod · Drift (SQLite) · local notifications · Gemini (optional)
+
+---
+
+Made for everyday use. Keep it in your pocket.

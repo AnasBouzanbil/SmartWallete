@@ -204,6 +204,18 @@ class TransactionRepository {
     );
   }
 
+  /// Undoes [delete] (soft delete only clears the timestamp).
+  Future<void> restore(int id) {
+    return (_db.update(_db.transactions)
+          ..where(($TransactionsTable t) => t.id.equals(id)))
+        .write(
+      TransactionsCompanion(
+        deletedAt: const Value<DateTime?>(null),
+        updatedAt: Value<DateTime>(DateTime.now()),
+      ),
+    );
+  }
+
   TransactionWithCategory _mapRow(TypedResult row) {
     return TransactionWithCategory(
       transaction: row.readTable(_db.transactions),

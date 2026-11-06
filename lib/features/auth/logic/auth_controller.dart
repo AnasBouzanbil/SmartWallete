@@ -73,6 +73,15 @@ class AuthController extends Notifier<AuthState> {
     }
   }
 
+  /// Re-checks device biometrics (e.g. after enrolling a fingerprint).
+  Future<void> refreshBiometricAvailability() async {
+    final bool available = await _safeBiometricAvailable();
+    if (state.biometricAvailable == available) {
+      return;
+    }
+    state = state.copyWith(biometricAvailable: available);
+  }
+
   /// Creates the account and unlocks the app.
   ///
   /// Validation errors are returned as field errors by the UI; this method
@@ -163,6 +172,111 @@ class AuthController extends Notifier<AuthState> {
       startingBalance: updated.startingBalance,
       clearError: true,
     );
+  }
+
+  /// Updates the display name shown on Home and Settings.
+  Future<bool> updateName(String name) async {
+    final String trimmed = name.trim();
+    if (trimmed.isEmpty) {
+      state = state.copyWith(errorMessage: 'Enter a name.');
+      return false;
+    }
+    final UserCredentials? stored = await _store.read();
+    if (stored == null) {
+      return false;
+    }
+    await _store.write(stored.copyWith(name: trimmed));
+    state = state.copyWith(name: trimmed, clearError: true);
+    return true;
+  }
+
+  /// Changes the unlock password. Requires the current password.
+  Future<bool> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    final UserCredentials? stored = await _store.read();
+    if (stored == null) {
+      return false;
+    }
+    if (newPassword.length < minPasswordLength) {
+      state = state.copyWith(
+        errorMessage:
+            'Password must be at least $minPasswordLength characters.',
+      );
+      return false;
+    }
+    if (!await _verifyPassword(stored, currentPassword)) {
+      state = state.copyWith(errorMessage: 'Wrong current password.');
+      return false;
+    }
+
+    final PasswordHash newHash = await _hasher.hash(newPassword);
+    await _store.write(stored.copyWith(passwordHash: newHash.encode()));
+    state = state.copyWith(clearError: true);
+    return true;
+  }
+
+  /// Updates the starting balance used in the Home total.
+  ///
+  /// Requires [password] so this cannot be changed by accident.
+  Future<bool> updateStartingBalance({
+    required String password,
+    required double startingBalance,
+  }) async {
+    if (startingBalance < 0) {
+      state = state.copyWith(
+        errorMessage: 'Balance cannot be negative.',
+      );
+      return false;
+    }
+    final UserCredentials? stored = await _store.read();
+    if (stored == null) {
+      return false;
+    }
+    if (!await _verifyPassword(stored, password)) {
+      state = state.copyWith(errorMessage: 'Wrong password.');
+      return false;
+    }
+
+    await _store.write(stored.copyWith(startingBalance: startingBalance));
+    state = state.copyWith(
+      startingBalance: startingBalance,
+      clearError: true,
+    );
+    return true;
+  }
+
+  /// Creates a new recovery code (old one stops working). Requires [password].
+  ///
+  /// Returns the plain code once so the user can save it. It is only stored
+  /// as a hash after this.
+  Future<String?> regenerateRecoveryCode({required String password}) async {
+    final UserCredentials? stored = await _store.read();
+    if (stored == null) {
+      return null;
+    }
+    if (!await _verifyPassword(stored, password)) {
+      state = state.copyWith(errorMessage: 'Wrong password.');
+      return null;
+    }
+
+    final String code = RecoveryCode.generate();
+    final PasswordHash recoveryHash =
+        await _hasher.hash(RecoveryCode.normalize(code));
+    await _store.write(
+      stored.copyWith(recoveryCodeHash: recoveryHash.encode()),
+    );
+    state = state.copyWith(hasRecoveryCode: true, clearError: true);
+    return code;
+  }
+
+  Future<bool> _verifyPassword(
+    UserCredentials stored,
+    String password,
+  ) async {
+    final PasswordHash? hash = PasswordHash.tryDecode(stored.passwordHash);
+    return hash != null && await _hasher.verify(password, hash);
   }
 
   Future<void> resetWallet() async {

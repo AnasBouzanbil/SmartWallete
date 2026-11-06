@@ -95,6 +95,7 @@ class _AddTransactionScreenState
     if (type == _type) {
       return;
     }
+    HapticFeedback.selectionClick();
     setState(() {
       _type = type;
       _categoryId = null;
@@ -299,9 +300,12 @@ class _AddTransactionScreenState
               inputFormatters: <TextInputFormatter>[
                 FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
               ],
+              autofocus: !_isEditing,
               style: theme.textTheme.displaySmall?.copyWith(
                 fontWeight: FontWeight.w700,
-                color: colors.textPrimary,
+                color: _type == TransactionType.expense
+                    ? colors.expense
+                    : colors.income,
               ),
               decoration: InputDecoration(
                 prefixText: '${appCurrency.symbol} ',
@@ -358,6 +362,11 @@ class _AddTransactionScreenState
               ),
             ),
             const SizedBox(height: AppSpacing.space12),
+            _QuickDates(
+              date: _date,
+              onPick: (DateTime d) => setState(() => _date = d),
+            ),
+            const SizedBox(height: AppSpacing.space8),
             _DateField(date: _date, onTap: _pickDate),
             const SizedBox(height: AppSpacing.space12),
             TextField(
@@ -418,7 +427,11 @@ class _TypeSwitch extends StatelessWidget {
               vertical: AppSpacing.space12,
             ),
             decoration: BoxDecoration(
-              color: selected ? colors.accent : Colors.transparent,
+              color: selected
+                  ? (value == TransactionType.expense
+                      ? colors.expense
+                      : colors.accent)
+                  : Colors.transparent,
               borderRadius: BorderRadius.circular(AppSpacing.radiusPill),
             ),
             child: Text(
@@ -646,6 +659,52 @@ class _ReceiptField extends StatelessWidget {
         PhosphorIconsRegular.receipt,
         color: colors.textSecondary,
       ),
+    );
+  }
+}
+
+/// One-tap "Today" / "Yesterday" shortcuts above the date field.
+class _QuickDates extends StatelessWidget {
+  const _QuickDates({required this.date, required this.onPick});
+
+  final DateTime date;
+  final ValueChanged<DateTime> onPick;
+
+  bool _sameDay(DateTime a, DateTime b) =>
+      a.year == b.year && a.month == b.month && a.day == b.day;
+
+  @override
+  Widget build(BuildContext context) {
+    final AppColorSet colors = context.colors;
+    final ThemeData theme = Theme.of(context);
+    final DateTime now = DateTime.now();
+    final DateTime yesterday = now.subtract(const Duration(days: 1));
+
+    Widget chip(String label, DateTime value) {
+      final bool selected = _sameDay(date, value);
+      return Padding(
+        padding: const EdgeInsets.only(right: AppSpacing.space8),
+        child: ChoiceChip(
+          label: Text(label),
+          selected: selected,
+          showCheckmark: false,
+          labelStyle: theme.textTheme.labelMedium?.copyWith(
+            color: selected ? colors.onAccent : colors.textPrimary,
+            fontWeight: FontWeight.w600,
+          ),
+          onSelected: (_) {
+            HapticFeedback.selectionClick();
+            onPick(value);
+          },
+        ),
+      );
+    }
+
+    return Row(
+      children: <Widget>[
+        chip('Today', now),
+        chip('Yesterday', yesterday),
+      ],
     );
   }
 }

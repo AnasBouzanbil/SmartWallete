@@ -1,6 +1,9 @@
+import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:smartwallete/core/database/app_database.dart';
+import 'package:smartwallete/core/database/database_provider.dart';
 import 'package:smartwallete/core/theme/app_theme.dart';
 import 'package:smartwallete/features/auth/data/password_hasher.dart';
 import 'package:smartwallete/features/auth/data/user_credentials.dart';
@@ -19,6 +22,8 @@ void main() {
   testWidgets('the shell renders home, debts, stats and settings', (
     WidgetTester tester,
   ) async {
+    final AppDatabase db = AppDatabase(NativeDatabase.memory());
+    addTearDown(db.close);
     const PasswordHasher hasher = PasswordHasher(iterations: 1000);
     final FakeCredentialsStore store = FakeCredentialsStore();
     await store.write(
@@ -33,6 +38,7 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          databaseProvider.overrideWithValue(db),
           credentialsStoreProvider.overrideWithValue(store),
           passwordHasherProvider.overrideWithValue(hasher),
           biometricServiceProvider.overrideWithValue(FakeBiometricService()),
@@ -53,6 +59,10 @@ void main() {
             (ref) =>
                 Stream<StatsSummary>.value(StatsSummary.empty(DateTime.now())),
           ),
+          statsProvider.overrideWith(
+            (ref, DateTime month) =>
+                Stream<StatsSummary>.value(StatsSummary.empty(month)),
+          ),
         ],
         child: MaterialApp(theme: AppTheme.dark, home: const AppShell()),
       ),
@@ -61,12 +71,23 @@ void main() {
 
     expect(find.text('Total balance'), findsOneWidget);
 
-    await tester.tap(find.text('Debts'));
+    await tester.tap(
+      find.descendant(
+        of: find.byType(NavigationBar),
+        matching: find.text('Debts'),
+      ),
+    );
     await tester.pumpAndSettle();
-    expect(find.text('You owe'), findsOneWidget);
-    expect(find.text('No open debts'), findsOneWidget);
+    expect(find.text('You owe'), findsWidgets);
+    expect(find.text('No open debts'), findsWidgets);
+    expect(find.text('Add debt'), findsWidgets);
 
-    await tester.tap(find.text('Stats'));
+    await tester.tap(
+      find.descendant(
+        of: find.byType(NavigationBar),
+        matching: find.text('Stats'),
+      ),
+    );
     await tester.pumpAndSettle();
     expect(find.text('Statistics'), findsOneWidget);
 
@@ -74,9 +95,19 @@ void main() {
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
 
-    await tester.tap(find.text('Settings'));
+    await tester.tap(
+      find.descendant(
+        of: find.byType(NavigationBar),
+        matching: find.text('Settings'),
+      ),
+    );
     await tester.pumpAndSettle();
-    expect(find.text('Export JSON'), findsOneWidget);
-    expect(find.text('Import JSON'), findsOneWidget);
+    expect(find.text('Appearance'), findsOneWidget);
+    expect(find.text('Light'), findsOneWidget);
+    expect(find.text('Dark'), findsOneWidget);
+    expect(find.text('Security'), findsOneWidget);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump(const Duration(milliseconds: 50));
   });
 }

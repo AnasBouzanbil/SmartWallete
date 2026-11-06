@@ -345,6 +345,129 @@ void main() {
 
       expect(container.read(authControllerProvider).hasRecoveryCode, isFalse);
     });
+
+    test('updateName changes the stored display name', () async {
+      final store = FakeCredentialsStore();
+      final ProviderContainer container = await makeContainer(store: store);
+      final AuthController controller =
+          container.read(authControllerProvider.notifier);
+
+      await controller.createAccount(
+        name: 'Sara',
+        password: 'secret1',
+        startingBalance: 1000,
+      );
+
+      expect(await controller.updateName('  Mona  '), isTrue);
+      expect(container.read(authControllerProvider).name, 'Mona');
+      expect((await store.read())?.name, 'Mona');
+
+      expect(await controller.updateName('   '), isFalse);
+      expect(container.read(authControllerProvider).name, 'Mona');
+    });
+
+    test('changePassword requires the current password', () async {
+      final store = FakeCredentialsStore();
+      final ProviderContainer container = await makeContainer(store: store);
+      final AuthController controller =
+          container.read(authControllerProvider.notifier);
+
+      await controller.createAccount(
+        name: 'Sara',
+        password: 'secret1',
+        startingBalance: 1000,
+      );
+
+      expect(
+        await controller.changePassword(
+          currentPassword: 'wrong',
+          newPassword: 'newpass1',
+        ),
+        isFalse,
+      );
+
+      expect(
+        await controller.changePassword(
+          currentPassword: 'secret1',
+          newPassword: 'newpass1',
+        ),
+        isTrue,
+      );
+
+      controller.lock();
+      await controller.unlockWithPassword('newpass1');
+      expect(
+        container.read(authControllerProvider).status,
+        AuthStatus.unlocked,
+      );
+    });
+
+    test('updateStartingBalance is password gated', () async {
+      final store = FakeCredentialsStore();
+      final ProviderContainer container = await makeContainer(store: store);
+      final AuthController controller =
+          container.read(authControllerProvider.notifier);
+
+      await controller.createAccount(
+        name: 'Sara',
+        password: 'secret1',
+        startingBalance: 1000,
+      );
+
+      expect(
+        await controller.updateStartingBalance(
+          password: 'wrong',
+          startingBalance: 2500,
+        ),
+        isFalse,
+      );
+      expect(container.read(authControllerProvider).startingBalance, 1000);
+
+      expect(
+        await controller.updateStartingBalance(
+          password: 'secret1',
+          startingBalance: 2500,
+        ),
+        isTrue,
+      );
+      expect(container.read(authControllerProvider).startingBalance, 2500);
+      expect((await store.read())?.startingBalance, 2500);
+    });
+
+    test('regenerateRecoveryCode replaces the old code', () async {
+      final store = FakeCredentialsStore();
+      final ProviderContainer container = await makeContainer(store: store);
+      final AuthController controller =
+          container.read(authControllerProvider.notifier);
+
+      final String oldCode = await controller.createAccount(
+        name: 'Sara',
+        password: 'secret1',
+        startingBalance: 1000,
+      );
+      final String? newCode =
+          await controller.regenerateRecoveryCode(password: 'secret1');
+
+      expect(newCode, isNotNull);
+      expect(newCode, isNot(oldCode));
+
+      controller.lock();
+      expect(
+        await controller.resetPasswordWithRecoveryCode(
+          code: oldCode,
+          newPassword: 'otherpass',
+        ),
+        isFalse,
+      );
+
+      expect(
+        await controller.resetPasswordWithRecoveryCode(
+          code: newCode!,
+          newPassword: 'otherpass',
+        ),
+        isTrue,
+      );
+    });
   });
 }
 

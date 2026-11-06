@@ -42,11 +42,17 @@ class LocalAuthBiometricService implements BiometricService {
   @override
   Future<bool> isAvailable() async {
     try {
-      if (!await _auth.isDeviceSupported()) {
+      // canCheckBiometrics = hardware present; isDeviceSupported also covers
+      // device credential. Prefer biometrics-capable devices for our toggle.
+      final bool canCheck = await _auth.canCheckBiometrics;
+      final bool supported = await _auth.isDeviceSupported();
+      if (!canCheck && !supported) {
         return false;
       }
       final List<BiometricType> enrolled = await _auth.getAvailableBiometrics();
-      return enrolled.isNotEmpty;
+      // Some emulators/OEMs return an empty type list even when biometrics
+      // work; fall back to canCheckBiometrics in that case.
+      return enrolled.isNotEmpty || canCheck;
     } on PlatformException {
       return false;
     } on LocalAuthException {
@@ -58,7 +64,7 @@ class LocalAuthBiometricService implements BiometricService {
   Future<BiometricResult> authenticate() async {
     try {
       final bool ok = await _auth.authenticate(
-        localizedReason: 'Unlock Smart Wallet',
+        localizedReason: 'Unlock Pocket',
         biometricOnly: true,
         persistAcrossBackgrounding: true,
       );

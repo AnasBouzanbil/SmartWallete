@@ -7,7 +7,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Smartwallete</string>
+	<string>Pocket</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -15,7 +15,7 @@
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>smartwallete</string>
+	<string>Pocket</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
@@ -51,6 +51,8 @@
 	<string>Attach a receipt photo to a transaction.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>Take a receipt photo for a transaction.</string>
+	<key>NSFaceIDUsageDescription</key>
+	<string>Unlock Pocket with Face ID.</string>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
 	<key>UILaunchStoryboardName</key>

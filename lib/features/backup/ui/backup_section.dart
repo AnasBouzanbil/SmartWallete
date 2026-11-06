@@ -8,6 +8,7 @@ import 'package:phosphor_glyphs/phosphor_glyphs.dart';
 import '../../../core/money/display.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
+import '../../../core/theme/theme_mode_controller.dart';
 import '../../../core/widgets/app_card.dart';
 import '../../../core/widgets/primary_button.dart';
 import '../../auth/logic/auth_controller.dart';
@@ -136,6 +137,7 @@ class _BackupSectionState extends ConsumerState<BackupSection> {
           .read(backupServiceProvider)
           .import(document);
       ref.invalidate(defaultAccountProvider);
+      await ref.read(themeModeProvider.notifier).reload();
       try {
         await ref
             .read(authControllerProvider.notifier)
@@ -176,7 +178,7 @@ class _BackupSectionState extends ConsumerState<BackupSection> {
   String _fileName() {
     final DateTime now = DateTime.now();
     String two(int value) => value.toString().padLeft(2, '0');
-    return 'smart-wallet-backup-'
+    return 'pocket-backup-'
         '${now.year}${two(now.month)}${two(now.day)}-'
         '${two(now.hour)}${two(now.minute)}${two(now.second)}.json';
   }
@@ -267,7 +269,7 @@ class _BackupSectionState extends ConsumerState<BackupSection> {
               ),
               const SizedBox(height: AppSpacing.space8),
               Text(
-                'Restore a Smart Wallet backup. Importing replaces all '
+                'Restore a Pocket backup. Importing replaces all '
                 'current data, so export first if you are unsure.',
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: colors.textSecondary,
